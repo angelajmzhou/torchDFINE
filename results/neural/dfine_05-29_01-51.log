@@ -1,0 +1,18 @@
+05/29/2024 01:53:12 AM - DFINE Logger - INFO - Epoch 1, TRAIN
+1_step_mse: 1.08195
+2_steps_mse: 1.08399
+3_steps_mse: 1.08579
+4_steps_mse: 1.08738
+reg_loss: 0.00000, scale_l2: 0.00000
+behv_loss: 25.58057, scale_behv_recons: 20.00000
+model_loss: 4.33912, total_loss: 29.91969
+
+05/29/2024 01:54:33 AM - DFINE Logger - INFO - Epoch 1, VALID
+1_step_mse: 6.27844
+2_steps_mse: 6.26680
+3_steps_mse: 6.24834
+4_steps_mse: 6.22917
+reg_loss: 0.00000, scale_l2: 0.00000
+behv_loss: 6.23372, scale_behv_recons: 20.00000
+model_loss: 25.02276, total_loss: 31.25647
+

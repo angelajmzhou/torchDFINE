@@ -1,0 +1,67 @@
+device: cpu
+load:
+  ckpt: -1
+  resume_train: false
+loss:
+  scale_behv_recons: 20
+  scale_l2: 0
+  steps_ahead:
+  - 1
+  - 2
+  - 3
+  - 4
+lr:
+  cyclic:
+    base_lr: 0.005
+    gamma: 1
+    max_lr: 0.02
+    mode: triangular
+    step_size_up: 10
+  explr:
+    gamma: 0.9
+    step_size: 15
+  init: 0.02
+  scheduler: explr
+model:
+  activation: tanh
+  activation_mapper: tanh
+  behv_from_smooth: true
+  dim_a: 2
+  dim_x: 2
+  dim_y: 200
+  hidden_layer_list:
+  - 20
+  - 20
+  - 20
+  - 20
+  hidden_layer_list_mapper:
+  - 20
+  - 20
+  - 20
+  init_A_scale: 1
+  init_C_scale: 1
+  init_R_scale: 0.5
+  init_W_scale: 0.5
+  init_cov: 1
+  is_R_trainable: true
+  is_W_trainable: true
+  ldm_kernel_initializer: default
+  nn_kernel_initializer: xavier_normal
+  save_dir: ./results/swiss_roll/
+  save_steps: 10
+  supervise_behv: false
+  which_behv_dims:
+  - 0
+  - 1
+  - 2
+  - 3
+optim:
+  eps: 1.0e-08
+  grad_clip: 1
+seed: 0
+train:
+  batch_size: 1
+  num_epochs: 200
+  plot_save_steps: 50
+  print_log_steps: 10
+  valid_step: 1

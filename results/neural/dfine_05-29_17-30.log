@@ -1,0 +1,9 @@
+05/29/2024 05:33:03 PM - DFINE Logger - INFO - Epoch 1, TRAIN
+1_step_mse: 1.07748
+2_steps_mse: 1.07769
+3_steps_mse: 1.07762
+4_steps_mse: 1.07731
+reg_loss: 0.00000, scale_l2: 0.00000
+behv_loss: 26.03605, scale_behv_recons: 20.00000
+model_loss: 4.31010, total_loss: 30.34615
+
