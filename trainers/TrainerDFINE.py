@@ -889,3 +889,88 @@ class TrainerDFINE(BaseTrainer):
             if self.config.model.supervise_behv:
                 self.writer.add_scalar(f'scale_behv_recons', self.dfine.scale_behv_recons, epoch)
 
+
+
+            
+    def compute_avg_latents(self, train_loader, gamble = True, valid_loader=None):
+        """
+        Computes the time evolution of latent variables (x and a) by averaging over batches for both training and validation loaders.
+
+        Parameters:
+        ------------
+        - train_loader: torch.utils.data.DataLoader, DataLoader for the training dataset.
+        - valid_loader: torch.utils.data.DataLoader, DataLoader for the validation dataset (optional).
+
+        Returns:
+        ------------
+        - time_evolution: dict, Dictionary containing the time evolution of x and a variables for train and validation:
+            {
+                "train": {
+                    "x_pred": torch.Tensor (num_steps, dim_x),
+                    "x_filter": torch.Tensor (num_steps, dim_x),
+                    "x_smooth": torch.Tensor (num_steps, dim_x),
+                    "a_hat": torch.Tensor (num_steps, dim_a),
+                    "a_pred": torch.Tensor (num_steps, dim_a),
+                    "a_filter": torch.Tensor (num_steps, dim_a),
+                    "a_smooth": torch.Tensor (num_steps, dim_a),
+                },
+                "valid": {  # Only if valid_loader is provided
+                    "x_pred": torch.Tensor (num_steps, dim_x),
+                    "x_filter": torch.Tensor (num_steps, dim_x),
+                    "x_smooth": torch.Tensor (num_steps, dim_x),
+                    "a_hat": torch.Tensor (num_steps, dim_a),
+                    "a_pred": torch.Tensor (num_steps, dim_a),
+                    "a_filter": torch.Tensor (num_steps, dim_a),
+                    "a_smooth": torch.Tensor (num_steps, dim_a),
+                },
+            }
+        """
+        self.dfine.eval()  # Ensure the model is in evaluation mode
+
+        def process_loader(loader, save_results = True, valid = False):
+            """Helper function to process a single loader."""
+            latent_vars = {
+                "x_pred": [],
+                "x_filter": [],
+                "x_smooth": [],
+                "a_hat": [],
+                "a_pred": [],
+                "a_filter": [],
+                "a_smooth": [],
+            }
+            with torch.no_grad():
+                for i, batch in enumerate(loader):
+                    # Carry data to the appropriate device
+
+                    batch = carry_to_device(batch, device=self.device)
+                    y_batch, _behv_batch_ , mask_batch = batch
+                    model_vars = self.dfine(y=y_batch, mask=mask_batch)
+
+                    for key in latent_vars.keys():
+                        latent_vars[key].append(model_vars[key].detach().cpu())
+
+            # Concatenate along the batch dimension and average over it
+
+            for key in latent_vars.keys():
+                # Stack tensors into a single tensor of shape (num_trials, num_steps, dim)
+                stacked_trials = torch.stack(latent_vars[key], dim=0)  # Shape: (num_trials, num_steps, dim)
+                # Compute the mean across trials (dim=0)
+                time_point_average = stacked_trials.mean(dim=0)  # Shape: (num_steps, dim)
+                # Update latent_vars[key] with the averaged result
+                latent_vars[key] = time_point_average
+
+            if save_results:
+                save_dir = self.config.model.save_dir
+                os.makedirs(save_dir, exist_ok=True)
+                filename = f"{'g' if gamble else 'ng'}_latent_factor.pt"
+                save_path = os.path.join(save_dir, filename)
+                print(save_path)
+                torch.save(latent_vars, save_path)
+            return latent_vars
+
+        # Process both loaders
+        time_evolution = {"train": process_loader(train_loader, valid=False)}
+        if valid_loader is not None:
+            time_evolution["valid"] = process_loader(valid_loader, valid=True)
+
+        return time_evolution
