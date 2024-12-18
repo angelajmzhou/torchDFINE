@@ -892,7 +892,7 @@ class TrainerDFINE(BaseTrainer):
 
 
             
-    def compute_avg_latents(self, train_loader, gamble = True, valid_loader=None):
+    def compute_avg_latents(self, train_loader, gamble = True, subjnum = 1, valid_loader=None):
         """
         Computes the time evolution of latent variables (x and a) by averaging over batches for both training and validation loaders.
 
@@ -974,3 +974,44 @@ class TrainerDFINE(BaseTrainer):
             time_evolution["valid"] = process_loader(valid_loader, valid=True)
 
         return time_evolution
+
+    def compute_latents(self, train_loader, valid_loader=None, save_results=True):
+
+        self.dfine.eval()
+
+        with torch.no_grad():
+            encoding_dict = {
+                'train': {},  # Dictionary to store results by batch for training data
+                'valid': {}   # Dictionary to store results by batch for validation data (if valid_loader provided)
+            }
+
+            loaders = dict(train=train_loader, valid=valid_loader)
+            save_dir = self.config.model.save_dir
+
+            for train_valid, loader in loaders.items():
+                if isinstance(loader, torch.utils.data.dataloader.DataLoader):
+                    for batch_idx, batch in enumerate(loader):
+
+                        batch = carry_to_device(batch, device=self.device)
+                        _, _, mask_batch = batch  # Use only the mask_batch
+                        model_vars = self.dfine(mask=mask_batch)
+
+                        # Save results for the current batch in the dictionary
+                        encoding_dict[train_valid][batch_idx] = {
+                            'x_pred': model_vars['x_pred'].detach().cpu(),
+                            'x_filter': model_vars['x_filter'].detach().cpu(),
+                            'x_smooth': model_vars['x_smooth'].detach().cpu(),
+                            'a_hat': model_vars['a_hat'].detach().cpu(),
+                            'a_pred': model_vars['a_pred'].detach().cpu(),
+                            'a_filter': model_vars['a_filter'].detach().cpu(),
+                            'a_smooth': model_vars['a_smooth'].detach().cpu(),
+                            'mask': mask_batch.detach().cpu()
+                        }
+
+            if save_results:
+                final_save_path = os.path.join(save_dir, 'batchwise_latents.pt')
+                torch.save(encoding_dict, final_save_path)
+
+            return encoding_dict
+
+   
