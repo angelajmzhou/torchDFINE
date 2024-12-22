@@ -31,6 +31,8 @@ class TrainerDFINE(BaseTrainer):
     '''
 
     def __init__(self, config):
+        print("TrainerDFINE loaded from:", __file__)
+
         '''
         Initializer for a TrainerDFINE object. Note that TrainerDFINE is a subclass of trainers.BaseTrainer.
         
@@ -890,6 +892,80 @@ class TrainerDFINE(BaseTrainer):
                 self.writer.add_scalar(f'scale_behv_recons', self.dfine.scale_behv_recons, epoch)
 
 
+    def compute_latents(self, train_loader, valid_loader=None, save_results=True):
+        self.dfine.eval()
+
+        with torch.no_grad():
+            encoding_dict = {
+                'train': {
+                    'x_pred': [],
+                    'x_filter': [],
+                    'x_smooth': [],
+                    'a_hat': [],
+                    'a_pred': [],
+                    'a_filter': [],
+                    'a_smooth': [],
+                    'mask': []
+                },
+                'valid': {
+                    'x_pred': [],
+                    'x_filter': [],
+                    'x_smooth': [],
+                    'a_hat': [],
+                    'a_pred': [],
+                    'a_filter': [],
+                    'a_smooth': [],
+                    'mask': []
+                }
+            }
+
+            loaders = dict(train=train_loader, valid=valid_loader)
+            save_dir = self.config.model.save_dir
+
+            for train_valid, loader in loaders.items():
+                if isinstance(loader, torch.utils.data.dataloader.DataLoader):
+                    for batch_idx, batch in enumerate(loader):
+                        batch = carry_to_device(batch, device=self.device)
+
+                        # Unpack the batch
+                        try:
+                            y_batch, behv_batch, mask_batch = batch
+                        except ValueError:
+                            print(f"Unexpected batch format: {batch}")
+                            continue
+
+                        # Perform model inference
+                        try:
+                            model_vars = self.dfine(y=y_batch, mask=mask_batch)
+                        except Exception as e:
+                            print(f"Error during model forward pass: {e}")
+                            continue
+
+                        # Append results
+                        encoding_dict[train_valid]['x_pred'].append(model_vars['x_pred'].detach().cpu())
+                        encoding_dict[train_valid]['x_filter'].append(model_vars['x_filter'].detach().cpu())
+                        encoding_dict[train_valid]['x_smooth'].append(model_vars['x_smooth'].detach().cpu())
+                        encoding_dict[train_valid]['a_hat'].append(model_vars['a_hat'].detach().cpu())
+                        encoding_dict[train_valid]['a_pred'].append(model_vars['a_pred'].detach().cpu())
+                        encoding_dict[train_valid]['a_filter'].append(model_vars['a_filter'].detach().cpu())
+                        encoding_dict[train_valid]['a_smooth'].append(model_vars['a_smooth'].detach().cpu())
+                        encoding_dict[train_valid]['mask'].append(mask_batch.detach().cpu())
+
+            # Concatenate lists into tensors
+            for train_valid in ['train', 'valid']:
+                for key in encoding_dict[train_valid].keys():
+                    if encoding_dict[train_valid][key]:  # Only concatenate non-empty lists
+                        encoding_dict[train_valid][key] = torch.cat(encoding_dict[train_valid][key], dim=0)
+                    else:
+                        encoding_dict[train_valid][key] = torch.empty(0)  # Handle empty case
+
+            # Save results
+            if save_results:
+                final_save_path = os.path.join(save_dir, 'batchwise_latents.pt')
+                torch.save(encoding_dict, final_save_path)
+
+            return encoding_dict
+
 
             
     def compute_avg_latents(self, train_loader, gamble = True, subjnum = 1, valid_loader=None):
@@ -974,44 +1050,5 @@ class TrainerDFINE(BaseTrainer):
             time_evolution["valid"] = process_loader(valid_loader, valid=True)
 
         return time_evolution
-
-    def compute_latents(self, train_loader, valid_loader=None, save_results=True):
-
-        self.dfine.eval()
-
-        with torch.no_grad():
-            encoding_dict = {
-                'train': {},  # Dictionary to store results by batch for training data
-                'valid': {}   # Dictionary to store results by batch for validation data (if valid_loader provided)
-            }
-
-            loaders = dict(train=train_loader, valid=valid_loader)
-            save_dir = self.config.model.save_dir
-
-            for train_valid, loader in loaders.items():
-                if isinstance(loader, torch.utils.data.dataloader.DataLoader):
-                    for batch_idx, batch in enumerate(loader):
-
-                        batch = carry_to_device(batch, device=self.device)
-                        _, _, mask_batch = batch  # Use only the mask_batch
-                        model_vars = self.dfine(mask=mask_batch)
-
-                        # Save results for the current batch in the dictionary
-                        encoding_dict[train_valid][batch_idx] = {
-                            'x_pred': model_vars['x_pred'].detach().cpu(),
-                            'x_filter': model_vars['x_filter'].detach().cpu(),
-                            'x_smooth': model_vars['x_smooth'].detach().cpu(),
-                            'a_hat': model_vars['a_hat'].detach().cpu(),
-                            'a_pred': model_vars['a_pred'].detach().cpu(),
-                            'a_filter': model_vars['a_filter'].detach().cpu(),
-                            'a_smooth': model_vars['a_smooth'].detach().cpu(),
-                            'mask': mask_batch.detach().cpu()
-                        }
-
-            if save_results:
-                final_save_path = os.path.join(save_dir, 'batchwise_latents.pt')
-                torch.save(encoding_dict, final_save_path)
-
-            return encoding_dict
 
    
