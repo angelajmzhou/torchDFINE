@@ -924,20 +924,9 @@ class TrainerDFINE(BaseTrainer):
                 if isinstance(loader, torch.utils.data.dataloader.DataLoader):
                     for batch_idx, batch in enumerate(loader):
                         batch = carry_to_device(batch, device=self.device)
+                        y_batch, behv_batch, mask_batch = batch
+                        model_vars = self.dfine(y=y_batch, mask=mask_batch)
 
-                        # Unpack the batch
-                        try:
-                            y_batch, behv_batch, mask_batch = batch
-                        except ValueError:
-                            print(f"Unexpected batch format: {batch}")
-                            continue
-
-                        # Perform model inference
-                        try:
-                            model_vars = self.dfine(y=y_batch, mask=mask_batch)
-                        except Exception as e:
-                            print(f"Error during model forward pass: {e}")
-                            continue
 
                         # Append results
                         encoding_dict[train_valid]['x_pred'].append(model_vars['x_pred'].detach().cpu())
@@ -948,12 +937,5 @@ class TrainerDFINE(BaseTrainer):
                         encoding_dict[train_valid]['a_filter'].append(model_vars['a_filter'].detach().cpu())
                         encoding_dict[train_valid]['a_smooth'].append(model_vars['a_smooth'].detach().cpu())
 
-            # Concatenate lists into tensors
-            # for train_valid in ['train', 'valid']:
-            #     for key in encoding_dict[train_valid].keys():
-            #         if encoding_dict[train_valid][key]:  # Only concatenate non-empty lists
-            #             encoding_dict[train_valid][key] = torch.cat(encoding_dict[train_valid][key], dim=0)
-            #         else:
-            #             encoding_dict[train_valid][key] = torch.empty(0)  # Handle empty case
             return encoding_dict
 
