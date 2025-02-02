@@ -7,8 +7,9 @@ __pycache__/
 *.so
 
 # unnecessary folders
-results*
+results/
 trainers/__pycache__
+GTH_data/
 
 # Distribution / packaging
 .Python
