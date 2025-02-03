@@ -939,3 +939,41 @@ class TrainerDFINE(BaseTrainer):
 
             return encoding_dict
 
+    def model_eval(self, data_loader):
+        """
+        Evaluates the model on the provided data loader and returns the average loss.
+
+        Parameters:
+        -----------
+        data_loader : torch.utils.data.DataLoader
+            DataLoader containing evaluation data (e.g., validation or test data).
+
+        Returns:
+        -----------
+        avg_loss : float
+            The average total loss computed over the entire dataset.
+        """
+        # Put the model in evaluation mode.
+        self.dfine.eval()
+        total_loss = 0.0
+        total_samples = 0
+
+        # Disable gradient computation for evaluation.
+        with torch.no_grad():
+            for batch in data_loader:
+                # Transfer batch to the appropriate device.
+                batch = carry_to_device(batch, device=self.device)
+                y_batch, behv_batch, mask_batch = batch
+
+                # Perform a forward pass.
+                model_vars = self.dfine(y=y_batch, mask=mask_batch)
+
+                # Compute the loss (returns overall loss and a dictionary of loss components).
+                loss, loss_dict = self.dfine.compute_loss(
+                    y=y_batch,
+                    model_vars=model_vars,
+                    mask=mask_batch,
+                    behv=behv_batch  # include if behavior supervision is enabled
+                )
+
+        return loss,loss_dict
